@@ -10,13 +10,17 @@ repositories {
 }
 
 dependencies {
+    implementation("com.artemwhite:catalog-service:1.0.0")
+    implementation("com.artemwhite:satellite-service:1.0.0")
+    implementation("com.artemwhite:user-service:1.0.0")
+    implementation("com.artemwhite:shared:1.0.0")
     testImplementation(kotlin("test"))
-}
-
-tasks.test {
-    useJUnitPlatform()
 }
 
 kotlin {
     jvmToolchain(8)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
