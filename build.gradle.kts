@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.24"
+    kotlin("jvm") version "2.4.0"
 }
 
 group = "org.example"
@@ -18,7 +18,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain(17)
 }
 
 tasks.test {
