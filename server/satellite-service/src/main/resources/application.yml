@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: satellite-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/satellite}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+server:
+  port: ${SERVER_PORT:8082}
+
+satellite:
+  catalog:
+    base-url: ${CATALOG_BASE_URL:http://localhost:8080}
+  celestrak:
+    url: '${CELESTRAK_URL:https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle}'
+  event:
+    url: ${EVENT_URL:http://localhost:8083/api/v1/events}

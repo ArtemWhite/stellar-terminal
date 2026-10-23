@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  catalog-service:
+    build:
+      context: .
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/catalog
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy

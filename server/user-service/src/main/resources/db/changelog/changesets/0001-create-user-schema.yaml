@@ -1,0 +1,162 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0001-create-user-schema
+      author: artemwhite
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: nickname
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password_hash
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: favorites
+            columns:
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: object_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: added_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: collections
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: collection_objects
+            columns:
+              - column:
+                  name: collection_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: object_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+        - createTable:
+            tableName: presets
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: colors
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scale
+                  type: double precision
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: favorites
+            indexName: idx_favorites_user
+            columns:
+              - column:
+                  name: user_id
+        - createIndex:
+            tableName: collections
+            indexName: idx_collections_user
+            columns:
+              - column:
+                  name: user_id
+        - createIndex:
+            tableName: collection_objects
+            indexName: idx_collection_objects_collection
+            columns:
+              - column:
+                  name: collection_id
+        - createIndex:
+            tableName: presets
+            indexName: idx_presets_user
+            columns:
+              - column:
+                  name: user_id
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: false
+            sql: |
+              CREATE TABLE notifications (
+                id          uuid NOT NULL,
+                user_id     uuid NOT NULL,
+                text        text NOT NULL,
+                read        boolean NOT NULL DEFAULT FALSE,
+                created_at  timestamptz NOT NULL,
+                PRIMARY KEY (id)
+              ) PARTITION BY HASH (id);
+
+              CREATE TABLE notifications_p0 PARTITION OF notifications FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+              CREATE TABLE notifications_p1 PARTITION OF notifications FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+              CREATE TABLE notifications_p2 PARTITION OF notifications FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+              CREATE TABLE notifications_p3 PARTITION OF notifications FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+
+              CREATE INDEX idx_notifications_user ON notifications (user_id, created_at);

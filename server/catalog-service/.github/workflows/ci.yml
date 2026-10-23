@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      # Подтягиваем исходники shared, чтобы composite-подстановка в settings.gradle.kts
+      # нашла их и не качала артефакт из GitHub Packages. shared приватный, поэтому
+      # нужен PAT со scope contents:read (секрет SHARED_READ_TOKEN в настройках репозитория).
+      - uses: actions/checkout@v4
+        with:
+          repository: ArtemWhite/shared
+          path: shared
+          token: ${{ secrets.SHARED_READ_TOKEN }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'   # Gradle 8.14.4 запускается на JDK 17; сам код компилируется под toolchain 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # чтобы скачать shared из GitHub Packages
+          GITHUB_ACTOR: ${{ github.actor }}

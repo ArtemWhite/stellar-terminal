@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Архитектура OrbitWatch</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #080b0f;
+    --bg-2: #0b0f15;
+    --panel: #0e131a;
+    --panel-2: #121821;
+    --text: #d7e0ea;
+    --text-strong: #eef3f8;
+    --muted: #7e8c99;
+    --line: #1e2833;
+    --line-soft: #161f29;
+    --accent: #3be8a0;
+    --accent-dim: #1e9e6f;
+    --accent-ink: #06120c;
+    --amber: #e2a93b;
+    --sky: #5cb8f7;
+    --mono: "Space Mono", "Courier New", monospace;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px 96px; }
+
+  header {
+    border-bottom: 1px solid var(--line);
+    background: radial-gradient(1200px 400px at 50% -120px, rgba(59,232,160,0.10), transparent 60%), var(--bg-2);
+    padding: 64px 0 40px;
+  }
+  .wrap--header { padding-bottom: 0; }
+  .terminal { font-family: var(--mono); color: var(--muted); font-size: 14px; line-height: 1.9; }
+  .terminal .prompt { color: var(--accent); }
+  .terminal .cursor {
+    display: inline-block; width: 0.6em; height: 1.05em; vertical-align: -0.18em;
+    background: var(--accent); margin-left: 2px; animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  h1 {
+    font-family: var(--mono); font-size: clamp(28px, 5vw, 44px); font-weight: 700;
+    color: var(--text-strong); letter-spacing: -0.5px; margin: 18px 0 10px; text-wrap: balance;
+  }
+  .lede { max-width: 64ch; color: var(--muted); font-size: 17px; margin: 0 0 22px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    border: 1px solid var(--line); background: var(--panel); padding: 4px 10px; border-radius: 3px; letter-spacing: 0.3px;
+  }
+  .chip b { color: var(--accent); font-weight: 700; }
+
+  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 40px 0 8px; }
+  .toc a {
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; border-radius: 3px;
+    display: flex; gap: 10px; align-items: baseline;
+  }
+  .toc a:hover { border-color: var(--accent-dim); text-decoration: none; color: var(--text-strong); }
+  .toc .n { color: var(--accent); font-weight: 700; }
+
+  section { margin-top: 64px; scroll-margin-top: 24px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 6px; }
+  h2 { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--text-strong); margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.3px; }
+  h3 { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--text-strong); margin: 28px 0 8px; }
+  p { max-width: 70ch; margin: 0 0 14px; color: var(--text); }
+  p .em { color: var(--accent); font-family: var(--mono); font-size: 0.9em; }
+  .small { color: var(--muted); font-size: 14px; }
+  ul, ol { max-width: 70ch; padding-left: 1.3em; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--accent); }
+
+  .note {
+    border-left: 3px solid var(--amber); background: rgba(226,169,59,0.06);
+    padding: 12px 16px; border-radius: 0 4px 4px 0; margin: 18px 0; max-width: 70ch; font-size: 14.5px;
+  }
+  .note b { color: var(--amber); font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .note code { color: var(--amber); }
+
+  .patterns {
+    border-left: 3px solid var(--accent); background: rgba(59,232,160,0.05);
+    padding: 12px 16px; border-radius: 0 4px 4px 0; margin: 18px 0; max-width: 74ch; font-size: 14px;
+  }
+  .patterns b { color: var(--accent); font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .patterns .p { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+
+  figure { margin: 22px 0 30px; }
+  .diagram { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 20px 18px; overflow-x: auto; }
+  figure figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  figure figcaption::before { content: "▸ "; color: var(--accent); }
+  pre.mermaid { background: transparent; margin: 0; font-family: var(--mono); }
+
+  pre.code {
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 16px 18px; overflow-x: auto; color: #c8d4e0;
+  }
+  pre.code .c { color: #55636f; }
+  pre.code .k { color: var(--accent); }
+  pre.code .s { color: #9fd0bd; }
+
+  .svcbadge { display: inline-flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .svcbadge .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .d-catalog { background: var(--accent); }
+  .d-satellite { background: var(--sky); }
+  .d-user { background: var(--amber); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--panel-2); font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  td code, p code, li code {
+    font-family: var(--mono); font-size: 0.85em; color: var(--accent);
+    background: rgba(59,232,160,0.08); padding: 1px 5px; border-radius: 3px;
+  }
+  .verb { font-family: var(--mono); font-weight: 700; font-size: 12px; }
+  .vget { color: var(--sky); }
+  .vpost { color: var(--accent); }
+  .vput { color: var(--amber); }
+  .vdel { color: #e06c75; }
+  .vpatch { color: #b48ce9; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+
+  footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap wrap--header">
+    <div class="terminal">
+      <span class="prompt">$</span> orbitwatch --architecture --full<br>
+      <span class="prompt">$</span> target: server · catalog + satellite + user · spring boot 4<span class="cursor"></span>
+    </div>
+    <h1>Архитектура OrbitWatch</h1>
+    <p class="lede">Полная карта серверной части — три микросервиса, общая библиотека контрактов, межсервисные вызовы и схема БД. По этой карте пишется весь backend.</p>
+    <div class="meta">
+      <span class="chip">стек: <b>Kotlin + Spring Boot 4</b></span>
+      <span class="chip">архитектура: <b>hexagonal · microservices</b></span>
+      <span class="chip">БД: <b>PostgreSQL + Liquibase</b></span>
+      <span class="chip">связь: <b>REST + события</b></span>
+      <span class="chip">источник: <b>CelesTrak</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc" aria-label="Содержание">
+    <a href="#decisions"><span class="n">00</span> Решения</a>
+    <a href="#context"><span class="n">01</span> Контекст</a>
+    <a href="#repos"><span class="n">02</span> Репозитории</a>
+    <a href="#inter"><span class="n">03</span> Связи сервисов</a>
+    <a href="#shared"><span class="n">04</span> shared</a>
+    <a href="#catalog"><span class="n">05</span> catalog-service</a>
+    <a href="#satellite"><span class="n">06</span> satellite-service</a>
+    <a href="#user"><span class="n">07</span> user-service</a>
+    <a href="#flows"><span class="n">08</span> Потоки</a>
+    <a href="#data"><span class="n">09</span> Схема БД</a>
+    <a href="#api"><span class="n">10</span> REST API</a>
+    <a href="#deploy"><span class="n">11</span> Запуск</a>
+  </nav>
+
+  <!-- 00 -->
+  <section id="decisions">
+    <p class="eyebrow">00 · Decisions</p>
+    <h2>Что зафиксировано</h2>
+    <ul>
+      <li><b>Полный сервер</b> — три сервиса: <code>catalog-service</code>, <code>satellite-service</code>, <code>user-service</code>. Каждый — свой репозиторий, свой порт, своя схема БД.</li>
+      <li><b>Общий контракт</b> — библиотека <code>shared</code> (<code>com.artemwhite:shared</code>): общие enum'ы, ссылки на объекты, события и структура ошибок. Сервисы зависят от неё на этапе компиляции.</li>
+      <li><b>Связь между сервисами</b> — синхронно через REST, асинхронно через события (порт скрывает транспорт).</li>
+      <li><b>Каждый сервис</b> — внутренне гексагональный: <code>domain</code> (чистый Kotlin) + <code>application</code> (use cases) + <code>web</code>/<code>persistence</code>/<code>outbound</code> (адаптеры).</li>
+      <li><b>Пагинация</b> — единый тип <code>PageResult&lt;T&gt;</code> в домене каждого сервиса; контроллеры принимают <code>page</code>/<code>size</code> и зажимают <code>size ∈ [1, 100]</code>.</li>
+    </ul>
+    <div class="note"><b>Границы ответственности</b> — <code>catalog</code> отвечает «что это за объект» (реестр, категории, статус). <code>satellite</code> — «где он сейчас» (TLE, орбиты, пролёты, события схода). <code>user</code> — «кто и что сохранил» (пользователи, избранное/коллекции, уведомления, пресеты).</div>
+  </section>
+
+  <!-- 01 -->
+  <section id="context">
+    <p class="eyebrow">01 · System Context</p>
+    <h2>Контекст системы</h2>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+flowchart TB
+  U["👤 Гость / Пользователь / Админ"]
+  C["🖥 client (stellar-terminal)"]
+  CAT["catalog-service :8080<br/>реестр объектов + статусы"]
+  SAT["satellite-service :8082<br/>TLE · орбиты · пролёты"]
+  USR["user-service :8083<br/>users · избранное · уведомления"]
+  SH[("shared<br/>enum · DTO · события")]
+  DB[("PostgreSQL<br/>3 базы данных")]
+  CEL["CelesTrak<br/>TLE (активные спутники)"]
+
+  U --> C
+  C -->|"REST"| CAT
+  C -->|"REST"| SAT
+  C -->|"REST"| USR
+  CAT --> DB
+  SAT --> DB
+  USR --> DB
+  SAT --> CEL
+  CAT -->|"depends"| SH
+  SAT -->|"depends"| SH
+  USR -->|"depends"| SH
+  C -->|"depends"| SH
+  SAT -->|"PATCH статус"| CAT
+  USR -->|"resolve объектов"| CAT
+  SAT -.->|"события статусов"| USR
+      </pre></div>
+      <figcaption>Клиент ходит во все три сервиса. Между сервисами: satellite → catalog (обновляет статус), satellite → user (события), user → catalog (резолвит избранное). Единственный внешний источник данных — CelesTrak (TLE), его использует только satellite-service.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 02 -->
+  <section id="repos">
+    <p class="eyebrow">02 · Repositories</p>
+    <h2>Репозитории и git-поток</h2>
+    <p>Пять самостоятельных репозиториев, связанных Gradle (<code>includeBuild</code> + <code>dependencySubstitution</code>), а не git submodules.</p>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+flowchart LR
+  subgraph HUB["репозиторий stellar-terminal"]
+    CLIENT["client/"]
+    ROOT["settings.gradle.kts<br/>includeBuild + substitution"]
+  end
+  subgraph GH["GitHub · ArtemWhite/*"]
+    CS["catalog-service"]
+    SS["satellite-service"]
+    US["user-service"]
+    SHR["shared"]
+  end
+  CLIENT -->|"implementation(shared)"| SHR
+  CS -->|"depends"| SHR
+  SS -->|"depends"| SHR
+  US -->|"depends"| SHR
+  ROOT -.->|"локально подставляет клоны"| GH
+      </pre></div>
+      <figcaption>Коммит в один репозиторий не трогает остальные. Связь — только на сборке: локально через исходники, в CI через опубликованный артефакт.</figcaption>
+    </figure>
+    <pre class="code"><span class="c"># клиент</span>
+cd stellar-terminal && git add client/ && git commit -m "..." && git push
+<span class="c"># каждый сервис отдельно</span>
+cd server/catalog-service && git add . && git commit -m "..." && git push
+cd server/satellite-service && git add . && git commit -m "..." && git push
+cd server/user-service && git add . && git commit -m "..." && git push
+<span class="c"># общий контракт</span>
+cd shared && git add . && git commit -m "..." && git push</pre>
+  </section>
+
+  <!-- 03 -->
+  <section id="inter">
+    <p class="eyebrow">03 · Inter-service</p>
+    <h2>Связи между сервисами</h2>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+flowchart LR
+  subgraph CAT["catalog-service"]
+    CAPI["PATCH /api/v1/objects/{id}/status<br/>GET /api/v1/objects/{id}"]
+  end
+  subgraph SAT["satellite-service"]
+    SAPI["ObjectRegistryClient (CatalogRestClient)<br/>→ PATCH статус"]
+    EVT["EventPublisher (EventHttpPublisher)<br/>→ событие статуса"]
+  end
+  subgraph USR["user-service"]
+    UAPI["ObjectRegistryClient (CatalogRestClient)<br/>→ resolve объектов"]
+    RECV["EventController<br/>← приём событий"]
+  end
+
+  SAPI -->|"PATCH статус (REST)"| CAPI
+  UAPI -->|"GET объектов (REST)"| CAPI
+  EVT -.->|"POST /api/v1/events (событие)"| RECV
+      </pre></div>
+      <figcaption>Три межсервисные связи. Все внешние вызовы идут через порты (интерфейсы), а REST-детали скрыты за <code>CatalogRestClient</code>/<code>EventHttpPublisher</code> (Anti-Corruption Layer): транспорт можно заменить на брокер, не трогая use cases.</figcaption>
+    </figure>
+    <h3>Кто кого вызывает</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Откуда</th><th>Куда</th><th>Зачем</th><th>Тип</th></tr></thead>
+        <tbody>
+          <tr><td>satellite-service</td><td>catalog-service</td><td>обновить статус объекта (DECAYED/ACTIVE), подтвердить, что это спутник</td><td>REST (синхр.)</td></tr>
+          <tr><td>satellite-service</td><td>user-service</td><td>сообщить о событии (сход с орбиты, пролёт) → уведомления</td><td>событие (асинхр.)</td></tr>
+          <tr><td>user-service</td><td>catalog-service</td><td>резолвить имена/категории избранных объектов</td><td>REST (синхр.)</td></tr>
+          <tr><td>client</td><td>все три</td><td>UI-запросы</td><td>REST</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="shared">
+    <p class="eyebrow">04 · Shared Library</p>
+    <h2>Библиотека shared</h2>
+    <p>Всё, что нужно нескольким сервисам одновременно. Это и есть «контракт взаимодействия»: поменял тип здесь → поднял версию → у потребителей ошибка компиляции.</p>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class ObjectCategory {
+    &lt;&lt;enumeration&gt;&gt;
+    SATELLITE
+    STAR
+    PLANET
+    NEBULA
+    GALAXY
+  }
+  class ObjectStatus {
+    &lt;&lt;enumeration&gt;&gt;
+    ACTIVE
+    INACTIVE
+    DECAYED
+    STALE
+  }
+  class SatelliteSubcategory {
+    &lt;&lt;enumeration&gt;&gt;
+    NAVIGATION
+    COMMUNICATION
+    SCIENTIFIC
+    MILITARY
+    WEATHER
+    EARTH_OBSERVATION
+  }
+  class SourceType {
+    &lt;&lt;enumeration&gt;&gt;
+    CELESTRAK
+    NASA_HORIZONS
+    SIMBAD
+    MANUAL
+  }
+  class EventType {
+    &lt;&lt;enumeration&gt;&gt;
+    STATUS_CHANGED
+    DECAYED
+    PASS_OVER
+  }
+  class ObjectRef {
+    +UUID objectId
+    +String name
+    +ObjectCategory category
+  }
+  class SatelliteEvent {
+    +UUID objectId
+    +ObjectStatus status
+    +EventType type
+    +Instant occurredAt
+  }
+  class ProblemDetail {
+    +String type
+    +String title
+    +int status
+    +String detail
+  }
+
+  ObjectRef --> ObjectCategory
+  SatelliteEvent --> ObjectStatus
+  SatelliteEvent --> EventType
+      </pre></div>
+      <figcaption>shared содержит только типы, без логики и без фреймворков. Каждый сервис добавляет свою модель поверх, а эти типы импортирует как <code>com.artemwhite.shared.*</code>.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 05 -->
+  <section id="catalog">
+    <p class="eyebrow">05 · catalog-service</p>
+    <div class="svcbadge"><span class="dot d-catalog"></span><h2 style="margin:0">catalog-service — реестр объектов</h2></div>
+    <p>Источник истины о том, <b>что</b> за объект: имя, категория, описание, источник. Каталог фильтруется через JPA <code>Specification</code> и отдаёт результат постранично.</p>
+    <h3>Домен + приложение</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class SpaceObject {
+    +UUID id
+    +String name
+    +ObjectCategory category
+    +SatelliteSubcategory subcategory
+    +String description
+    +String sourceId
+    +SourceType sourceType
+    +ObjectStatus status
+    +Instant createdAt
+    +Instant updatedAt
+    +changeStatus(status, now)
+    +recategorize(category, subcategory, now)
+    +create(id, name, ...)
+  }
+  class PageResult~T~ {
+    +List~T~ items
+    +int page
+    +int size
+    +long total
+  }
+  class SearchFilter {
+    +ObjectCategory category
+    +ObjectStatus status
+    +String query
+    +int page
+    +int size
+  }
+  class SpaceObjectRepository {
+    &lt;&lt;interface&gt;&gt;
+    +findById(id) SpaceObject
+    +existsById(id) boolean
+    +search(filter) PageResult
+    +save(obj) SpaceObject
+    +deleteById(id)
+  }
+  class Clock {
+    &lt;&lt;fun interface&gt;&gt;
+    +now() Instant
+  }
+  class DomainException {
+    &lt;&lt;abstract&gt;&gt;
+    +message String
+  }
+  class ObjectNotFoundException {
+    +objectId UUID
+  }
+  class InvalidCategoryException {
+    +category ObjectCategory
+    +subcategory SatelliteSubcategory
+  }
+
+  class CreateObjectCommand {
+    +name String
+    +category ObjectCategory
+    +subcategory SatelliteSubcategory
+    +description String
+    +sourceId String
+    +sourceType SourceType
+  }
+  class SearchObjectsUseCase {
+    +execute(filter) PageResult
+  }
+  class GetObjectUseCase {
+    +execute(id) SpaceObject
+  }
+  class CreateObjectUseCase {
+    +execute(command) SpaceObject
+  }
+  class CategorizeObjectUseCase {
+    +execute(id, category, subcategory) SpaceObject
+  }
+  class UpdateObjectStatusUseCase {
+    +execute(id, status) SpaceObject
+  }
+  class DeleteObjectUseCase {
+    +execute(id)
+  }
+
+  SpaceObject --> ObjectCategory
+  SpaceObject --> ObjectStatus
+  SpaceObject --> SourceType
+  SearchFilter --> ObjectCategory
+  SearchFilter --> ObjectStatus
+  SpaceObjectRepository --> SpaceObject
+  SpaceObjectRepository --> PageResult
+  ObjectNotFoundException --|> DomainException
+  InvalidCategoryException --|> DomainException
+
+  SearchObjectsUseCase --> SpaceObjectRepository
+  GetObjectUseCase --> SpaceObjectRepository
+  CreateObjectUseCase --> SpaceObjectRepository
+  CreateObjectUseCase --> Clock
+  CreateObjectUseCase --> CreateObjectCommand
+  CategorizeObjectUseCase --> SpaceObjectRepository
+  CategorizeObjectUseCase --> Clock
+  UpdateObjectStatusUseCase --> SpaceObjectRepository
+  UpdateObjectStatusUseCase --> Clock
+  DeleteObjectUseCase --> SpaceObjectRepository
+      </pre></div>
+      <figcaption><code>SpaceObject</code> — агрегат с инвариантом «подкатегория только у спутников» (<code>InvalidCategoryException</code>). <code>SearchObjectsUseCase</code> возвращает <code>PageResult&lt;SpaceObject&gt;</code> — пагинация живёт в домене, а не в контроллере.</figcaption>
+    </figure>
+    <h3>Адаптеры</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class SpaceObjectController {
+    +search(category, status, query, page, size) PageResult
+    +get(id) SpaceObjectResponse
+    +create(request) SpaceObjectResponse
+    +categorize(id, request) SpaceObjectResponse
+    +updateStatus(id, request) SpaceObjectResponse
+    +delete(id)
+  }
+  class GlobalExceptionHandler {
+    +handleNotFound(e)
+    +handleInvalidCategory(e)
+    +handleValidation(e)
+    +handleTypeMismatch(e)
+  }
+  class RequestLoggingFilter {
+    +doFilterInternal(...)
+  }
+  class CreateObjectRequest {
+    +name String
+    +category ObjectCategory
+    +subcategory SatelliteSubcategory
+    +description String
+    +sourceId String
+    +sourceType SourceType
+  }
+  class CategorizeRequest {
+    +category ObjectCategory
+    +subcategory SatelliteSubcategory
+  }
+  class UpdateStatusRequest {
+    +status ObjectStatus
+  }
+  class SpaceObjectResponse {
+    +id UUID
+    +name String
+    +category ObjectCategory
+    +subcategory SatelliteSubcategory
+    +description String
+    +sourceId String
+    +sourceType SourceType
+    +status ObjectStatus
+    +createdAt Instant
+    +updatedAt Instant
+  }
+  class SpaceObjectWebMapper {
+    +toCommand() CreateObjectCommand
+    +toResponse() SpaceObjectResponse
+    +toResponse() PageResult
+  }
+
+  class SystemClock
+  class SpaceObjectRepositoryAdapter {
+    +findById(id)
+    +existsById(id)
+    +search(filter) PageResult
+    +save(obj)
+    +deleteById(id)
+  }
+  class SpaceObjectMapper {
+    +toDomain() SpaceObject
+    +toEntity() SpaceObjectEntity
+  }
+  class SpaceObjectEntity
+  class SpaceObjectJpaRepository
+  class SpaceObjectSpecifications {
+    +from(filter) Specification
+  }
+
+  SpaceObjectController --> SearchObjectsUseCase
+  SpaceObjectController --> GetObjectUseCase
+  SpaceObjectController --> CreateObjectUseCase
+  SpaceObjectController --> CategorizeObjectUseCase
+  SpaceObjectController --> UpdateObjectStatusUseCase
+  SpaceObjectController --> DeleteObjectUseCase
+  SpaceObjectController --> SpaceObjectWebMapper
+
+  SystemClock ..|> Clock
+  SpaceObjectRepositoryAdapter ..|> SpaceObjectRepository
+  SpaceObjectRepositoryAdapter --> SpaceObjectJpaRepository
+  SpaceObjectRepositoryAdapter --> SpaceObjectSpecifications
+  SpaceObjectRepositoryAdapter --> SpaceObjectMapper
+  SpaceObjectJpaRepository --> SpaceObjectEntity
+  SpaceObjectMapper --> SpaceObjectEntity
+      </pre></div>
+      <figcaption>Входящий слой: контроллер + <code>GlobalExceptionHandler</code> + <code>RequestLoggingFilter</code> (correlation id через <code>X-Request-Id</code>). Исходящий: <code>SpaceObjectRepositoryAdapter</code> реализует порт на JPA + <code>Specification</code>.</figcaption>
+    </figure>
+    <div class="patterns">
+      <b>Паттерны</b> — <span class="p">Factory Method</span>: <code>SpaceObject.create(...)</code>. <span class="p">Specification</span>: <code>SpaceObjectSpecifications.from(filter)</code>. <span class="p">Repository</span>: порт <code>SpaceObjectRepository</code> + JPA-адаптер.
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="satellite">
+    <p class="eyebrow">06 · satellite-service</p>
+    <div class="svcbadge"><span class="dot d-satellite"></span><h2 style="margin:0">satellite-service — орбиты и положение</h2></div>
+    <p>Отвечает <b>где объект</b>: TLE из CelesTrak, расчёт положения, предсказание пролётов, события схода с орбиты.</p>
+    <h3>Домен + приложение</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class Satellite {
+    +UUID objectId
+    +int noradId
+    +ObjectStatus status
+    +changeStatus(newStatus)
+    +create(objectId, noradId)
+  }
+  class TleRecord {
+    +String line1
+    +String line2
+    +Instant epoch
+    +Instant fetchedAt
+  }
+  class ActiveTle {
+    +int noradId
+    +TleRecord tle
+  }
+  class Position {
+    +Double x
+    +Double y
+    +Double z
+    +Double vx
+    +Double vy
+    +Double vz
+  }
+  class OrbitSnapshot {
+    +Position position
+    +Instant calculatedAt
+  }
+  class PassPrediction {
+    +UUID objectId
+    +Instant start
+    +Instant end
+    +Double maxElevation
+  }
+  class PassQuery {
+    +Double minElevationDeg
+    +Long windowSeconds
+    +Long stepSeconds
+    +builder() Builder
+  }
+  class GroundStation {
+    +Double x
+    +Double y
+    +Double z
+    +elevationDeg(satellite) Double
+    +northPole()
+  }
+  class SyncReport {
+    +int updated
+    +int failed
+    +int decayed
+  }
+  class PageResult~T~ {
+    +List~T~ items
+    +int page
+    +int size
+    +long total
+  }
+
+  class SatelliteRepository {
+    &lt;&lt;interface&gt;&gt;
+    +findSatellite(objectId) Satellite
+    +findAll() List
+    +saveSatellite(s) Satellite
+    +findTle(objectId) TleRecord
+    +saveTle(objectId, tle) TleRecord
+    +findSnapshots(objectId, page, size) PageResult
+    +saveSnapshot(objectId, s) OrbitSnapshot
+  }
+  class TleProvider {
+    &lt;&lt;fun interface&gt;&gt;
+    +fetchActiveSatellites() List
+  }
+  class PositionCalculator {
+    &lt;&lt;fun interface&gt;&gt;
+    +propagate(tle, at) Position
+  }
+  class ObjectRegistryClient {
+    &lt;&lt;interface&gt;&gt;
+    +getObject(id) ObjectRef
+    +updateStatus(id, status)
+  }
+  class EventPublisher {
+    &lt;&lt;fun interface&gt;&gt;
+    +publish(event)
+  }
+  class Clock {
+    &lt;&lt;fun interface&gt;&gt;
+    +now() Instant
+  }
+
+  class DomainException {
+    &lt;&lt;abstract&gt;&gt;
+  }
+  class ObjectNotFoundException
+  class SatelliteNotFoundException
+  class NotASatelliteException
+  class InvalidTleException
+
+  class RegisterSatelliteCommand {
+    +UUID objectId
+    +int noradId
+  }
+  class SyncSatellitesUseCase {
+    +sync() SyncReport
+  }
+  class GetPositionUseCase {
+    +execute(objectId, at) Position
+  }
+  class GetTimelineUseCase {
+    +execute(objectId, page, size) PageResult
+  }
+  class PredictPassUseCase {
+    +execute(objectId, query, station) List
+  }
+  class RegisterSatelliteUseCase {
+    +execute(command) Satellite
+  }
+
+  Satellite --> ObjectStatus
+  SatelliteRepository --> Satellite
+  SatelliteRepository --> TleRecord
+  SatelliteRepository --> OrbitSnapshot
+  SatelliteRepository --> PageResult
+  TleProvider --> ActiveTle
+  PredictPassUseCase --> PassQuery
+  PredictPassUseCase --> GroundStation
+  PredictPassUseCase --> PassPrediction
+  ObjectNotFoundException --|> DomainException
+  SatelliteNotFoundException --|> DomainException
+  NotASatelliteException --|> DomainException
+  InvalidTleException --|> DomainException
+
+  SyncSatellitesUseCase --> SatelliteRepository
+  SyncSatellitesUseCase --> TleProvider
+  SyncSatellitesUseCase --> PositionCalculator
+  SyncSatellitesUseCase --> ObjectRegistryClient
+  SyncSatellitesUseCase --> EventPublisher
+  SyncSatellitesUseCase --> Clock
+  GetPositionUseCase --> SatelliteRepository
+  GetPositionUseCase --> ObjectRegistryClient
+  GetPositionUseCase --> PositionCalculator
+  GetPositionUseCase --> Clock
+  GetTimelineUseCase --> SatelliteRepository
+  PredictPassUseCase --> SatelliteRepository
+  PredictPassUseCase --> PositionCalculator
+  PredictPassUseCase --> Clock
+  RegisterSatelliteUseCase --> SatelliteRepository
+  RegisterSatelliteUseCase --> RegisterSatelliteCommand
+      </pre></div>
+      <figcaption>Доменные модели хранят только то, что знает satellite: <code>TleRecord</code>, <code>OrbitSnapshot</code>, <code>PassQuery</code> (со <code>Builder</code>), <code>GroundStation</code>. <code>SyncSatellitesUseCase.sync()</code> возвращает <code>SyncReport(updated, failed, decayed)</code>.</figcaption>
+    </figure>
+    <h3>Адаптеры</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class SatelliteController {
+    +position(objectId, at) PositionResponse
+    +passes(objectId, minElevation, window, step) List
+    +timeline(objectId, page, size) PageResult
+  }
+  class AdminController {
+    +sync() SyncReportResponse
+    +register(request) SatelliteResponse
+  }
+  class GlobalExceptionHandler {
+    +handleObjectNotFound(e)
+    +handleSatelliteNotFound(e)
+    +handleNotASatellite(e)
+    +handleInvalidTle(e)
+    +handleValidation(e)
+    +handleTypeMismatch(e)
+  }
+  class RequestLoggingFilter {
+    +doFilterInternal(...)
+  }
+  class RegisterSatelliteRequest {
+    +UUID objectId
+    +int noradId
+  }
+  class SatelliteResponse {
+    +UUID objectId
+    +int noradId
+    +ObjectStatus status
+  }
+  class PositionResponse {
+    +Double x, y, z, vx, vy, vz
+  }
+  class OrbitSnapshotResponse {
+    +PositionResponse position
+    +Instant calculatedAt
+  }
+  class PassPredictionResponse {
+    +UUID objectId
+    +Instant start
+    +Instant end
+    +Double maxElevation
+  }
+  class SyncReportResponse {
+    +int updated
+    +int failed
+    +int decayed
+  }
+  class SatelliteWebMapper {
+    +toCommand()
+    +toResponse()
+  }
+
+  class SystemClock
+  class Sgp4Calculator {
+    +propagate(tle, at) Position
+  }
+  class TleParser {
+    +parseElements(line1, line2) Elements
+    +toActiveTle(line1, line2, fetchedAt) ActiveTle
+  }
+  class CelesTrakClient {
+    +fetchActiveSatellites() List
+    +parseResponse(body, fetchedAt) List
+  }
+  class CatalogRestClient {
+    +getObject(id) ObjectRef
+    +updateStatus(id, status)
+    +parseObjectRef(body) ObjectRef
+  }
+  class EventHttpPublisher {
+    +publish(event)
+  }
+  class SatelliteRepositoryAdapter {
+    +findSatellite()
+    +findAll()
+    +saveSatellite()
+    +findTle()
+    +saveTle()
+    +findSnapshots()
+    +saveSnapshot()
+  }
+  class SatellitePersistenceMapper {
+    +toDomain()
+    +toEntity()
+  }
+  class SatelliteEntity
+  class TleRecordEntity
+  class OrbitSnapshotEntity
+  class SatelliteJpaRepository
+  class TleRecordJpaRepository
+  class OrbitSnapshotJpaRepository
+
+  SatelliteController --> GetPositionUseCase
+  SatelliteController --> GetTimelineUseCase
+  SatelliteController --> PredictPassUseCase
+  AdminController --> SyncSatellitesUseCase
+  AdminController --> RegisterSatelliteUseCase
+
+  SystemClock ..|> Clock
+  Sgp4Calculator ..|> PositionCalculator
+  Sgp4Calculator --> TleParser
+  CelesTrakClient ..|> TleProvider
+  CelesTrakClient --> TleParser
+  CelesTrakClient --> Clock
+  CatalogRestClient ..|> ObjectRegistryClient
+  EventHttpPublisher ..|> EventPublisher
+  SatelliteRepositoryAdapter ..|> SatelliteRepository
+  SatelliteRepositoryAdapter --> SatelliteJpaRepository
+  SatelliteRepositoryAdapter --> TleRecordJpaRepository
+  SatelliteRepositoryAdapter --> OrbitSnapshotJpaRepository
+  SatelliteRepositoryAdapter --> SatellitePersistenceMapper
+      </pre></div>
+      <figcaption><code>Sgp4Calculator</code> — ручной расчёт орбиты (без Orekit) поверх распарсенных <code>TleParser.Elements</code>. <code>CatalogRestClient</code> и <code>EventHttpPublisher</code> — REST-адаптеры (ACL), реализующие порты связи с соседними сервисами.</figcaption>
+    </figure>
+    <div class="patterns">
+      <b>Паттерны</b> — <span class="p">Builder</span>: <code>PassQuery.Builder</code>. <span class="p">Factory Method</span>: <code>Satellite.create(...)</code>. <span class="p">Proxy / ACL</span>: <code>CatalogRestClient</code> → порт <code>ObjectRegistryClient</code>.
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section id="user">
+    <p class="eyebrow">07 · user-service</p>
+    <div class="svcbadge"><span class="dot d-user"></span><h2 style="margin:0">user-service — пользователи и избранное</h2></div>
+    <p>Отвечает <b>кто и что сохранил</b>: учётные записи, избранное/коллекции, уведомления, пресеты визуализации. Принимает события от satellite-service и рассылает уведомления через <b>Visitor</b>.</p>
+    <h3>Домен: модели, события (Visitor), порты</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class User {
+    +UUID id
+    +String nickname
+    +Email email
+    +PasswordHash passwordHash
+    +Role role
+    +Instant createdAt
+    +changeRole(newRole)
+    +create(id, nickname, email, hash, role, now)
+  }
+  class Email {
+    +String value
+  }
+  class PasswordHash {
+    +String value
+  }
+  class Role {
+    &lt;&lt;enumeration&gt;&gt;
+    GUEST
+    REGISTERED
+    ADMIN
+  }
+  class Favorite {
+    +UUID userId
+    +UUID objectId
+    +Instant addedAt
+    +create(userId, objectId, now)
+  }
+  class Collection {
+    +UUID id
+    +UUID userId
+    +String name
+    +List objectIds
+    +rename(newName)
+    +addObject(objectId)
+    +removeObject(objectId)
+    +create(id, userId, name, objectIds)
+  }
+  class Notification {
+    +UUID id
+    +UUID userId
+    +String text
+    +Boolean read
+    +Instant createdAt
+    +markAsRead()
+    +create(id, userId, text, now)
+  }
+  class VisualizationPreset {
+    +UUID id
+    +UUID userId
+    +String colors
+    +Double scale
+    +update(colors, scale)
+    +create(id, userId, colors, scale)
+  }
+  class PageResult~T~ {
+    +List~T~ items
+    +int page
+    +int size
+    +long total
+  }
+
+  class SatelliteDomainEvent {
+    &lt;&lt;abstract&gt;&gt;
+    +UUID objectId
+    +accept(visitor) R
+  }
+  class StatusChangedEvent {
+    +ObjectStatus status
+    +Instant occurredAt
+  }
+  class DecayedEvent {
+    +Instant occurredAt
+  }
+  class PassOverEvent {
+    +Instant occurredAt
+  }
+  class SatelliteEventVisitor~R~ {
+    &lt;&lt;interface&gt;&gt;
+    +visitStatusChanged(e) R
+    +visitDecayed(e) R
+    +visitPassOver(e) R
+  }
+  class NotificationTextBuilder {
+    +visitStatusChanged() String
+    +visitDecayed() String
+    +visitPassOver() String
+  }
+  class NotificationSeverityAssessor {
+    +visitStatusChanged() NotificationSeverity
+    +visitDecayed() NotificationSeverity
+    +visitPassOver() NotificationSeverity
+  }
+  class NotificationSeverity {
+    &lt;&lt;enumeration&gt;&gt;
+    INFO
+    WARNING
+    CRITICAL
+  }
+
+  class UserRepository {
+    &lt;&lt;interface&gt;&gt;
+    findById(id)
+    findByEmail(email)
+    existsByEmail(email)
+    save(user)
+  }
+  class FavoriteRepository {
+    &lt;&lt;interface&gt;&gt;
+    findByUser(userId, page, size)
+    findUserIdsByObject(objectId)
+    exists(userId, objectId)
+    save(favorite)
+    delete(userId, objectId)
+  }
+  class NotificationRepository {
+    &lt;&lt;interface&gt;&gt;
+    findById(id)
+    findByUser(userId, page, size)
+    save(notification)
+  }
+  class CollectionRepository {
+    &lt;&lt;interface&gt;&gt;
+    findById(id)
+    findByUser(userId, page, size)
+    save(collection)
+    delete(id)
+  }
+  class VisualizationPresetRepository {
+    &lt;&lt;interface&gt;&gt;
+    findById(id)
+    findByUser(userId, page, size)
+    save(preset)
+  }
+  class NotificationSender {
+    &lt;&lt;interface&gt;&gt;
+    send(user, notification)
+  }
+  class ObjectRegistryClient {
+    &lt;&lt;interface&gt;&gt;
+    getObject(objectId) ObjectRef
+  }
+  class PasswordHasher {
+    &lt;&lt;interface&gt;&gt;
+    hash(raw) PasswordHash
+    verify(raw, hash) boolean
+  }
+  class TokenProvider {
+    &lt;&lt;interface&gt;&gt;
+    issue(userId, role) String
+  }
+  class Clock {
+    &lt;&lt;fun interface&gt;&gt;
+    now() Instant
+  }
+
+  class DomainException {
+    &lt;&lt;abstract&gt;&gt;
+  }
+  class UserNotFoundException
+  class DuplicateEmailException
+  class InvalidCredentialsException
+  class FavoriteAlreadyExistsException
+  class ObjectNotFoundException
+  class CollectionNotFoundException
+  class NotificationNotFoundException
+  class PresetNotFoundException
+
+  User --> Email
+  User --> PasswordHash
+  User --> Role
+  StatusChangedEvent --|> SatelliteDomainEvent
+  DecayedEvent --|> SatelliteDomainEvent
+  PassOverEvent --|> SatelliteDomainEvent
+  SatelliteDomainEvent --> SatelliteEventVisitor
+  NotificationTextBuilder ..|> SatelliteEventVisitor
+  NotificationSeverityAssessor ..|> SatelliteEventVisitor
+  NotificationSeverityAssessor --> NotificationSeverity
+
+  UserNotFoundException --|> DomainException
+  DuplicateEmailException --|> DomainException
+  InvalidCredentialsException --|> DomainException
+  FavoriteAlreadyExistsException --|> DomainException
+  ObjectNotFoundException --|> DomainException
+  CollectionNotFoundException --|> DomainException
+  NotificationNotFoundException --|> DomainException
+  PresetNotFoundException --|> DomainException
+      </pre></div>
+      <figcaption>Ядро user-service. <code>SatelliteDomainEvent</code> — sealed-иерархия с <code>accept(visitor)</code>: любая операция, зависящая от типа события, выражена как <code>SatelliteEventVisitor&lt;R&gt;</code>. <code>Email</code>/<code>PasswordHash</code> — value-объекты с инвариантами; <code>PageResult&lt;T&gt;</code> — общий контейнер пагинации.</figcaption>
+    </figure>
+    <h3>Приложение: use cases</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class RegisterUserCommand {
+    +String nickname
+    +Email email
+    +String password
+  }
+  class CreateCollectionCommand {
+    +UUID userId
+    +String name
+  }
+  class SavePresetCommand {
+    +UUID userId
+    +String colors
+    +Double scale
+  }
+  class AuthResult {
+    +User user
+    +String token
+  }
+  class ResolvedFavorite {
+    +Favorite favorite
+    +ObjectRef objectRef
+  }
+
+  class RegisterUserUseCase {
+    +execute(command) User
+  }
+  class AuthenticateUserUseCase {
+    +execute(email, password) AuthResult
+  }
+  class GetUserUseCase {
+    +execute(id) User
+  }
+  class AddFavoriteUseCase {
+    +execute(userId, objectId) ResolvedFavorite
+  }
+  class RemoveFavoriteUseCase {
+    +execute(userId, objectId)
+  }
+  class ListFavoritesUseCase {
+    +execute(userId, page, size) PageResult
+  }
+  class HandleSatelliteEventUseCase {
+    +execute(event)
+  }
+  class ListNotificationsUseCase {
+    +execute(userId, page, size) PageResult
+  }
+  class MarkNotificationReadUseCase {
+    +execute(id) Notification
+  }
+  class CreateCollectionUseCase {
+    +execute(command) Collection
+  }
+  class AddObjectToCollectionUseCase {
+    +execute(collectionId, objectId) Collection
+  }
+  class RemoveObjectFromCollectionUseCase {
+    +execute(collectionId, objectId) Collection
+  }
+  class ListCollectionsUseCase {
+    +execute(userId, page, size) PageResult
+  }
+  class DeleteCollectionUseCase {
+    +execute(id)
+  }
+  class SavePresetUseCase {
+    +execute(command) VisualizationPreset
+  }
+  class UpdatePresetUseCase {
+    +execute(id, colors, scale) VisualizationPreset
+  }
+  class ListPresetsUseCase {
+    +execute(userId, page, size) PageResult
+  }
+
+  RegisterUserUseCase --> UserRepository
+  RegisterUserUseCase --> PasswordHasher
+  RegisterUserUseCase --> Clock
+  RegisterUserUseCase --> RegisterUserCommand
+  AuthenticateUserUseCase --> UserRepository
+  AuthenticateUserUseCase --> PasswordHasher
+  AuthenticateUserUseCase --> TokenProvider
+  AuthenticateUserUseCase --> AuthResult
+  GetUserUseCase --> UserRepository
+  AddFavoriteUseCase --> FavoriteRepository
+  AddFavoriteUseCase --> ObjectRegistryClient
+  AddFavoriteUseCase --> Clock
+  AddFavoriteUseCase --> ResolvedFavorite
+  RemoveFavoriteUseCase --> FavoriteRepository
+  ListFavoritesUseCase --> FavoriteRepository
+  ListFavoritesUseCase --> ObjectRegistryClient
+  ListFavoritesUseCase --> ResolvedFavorite
+  HandleSatelliteEventUseCase --> FavoriteRepository
+  HandleSatelliteEventUseCase --> UserRepository
+  HandleSatelliteEventUseCase --> NotificationRepository
+  HandleSatelliteEventUseCase --> NotificationSender
+  HandleSatelliteEventUseCase --> Clock
+  HandleSatelliteEventUseCase --> NotificationTextBuilder
+  ListNotificationsUseCase --> NotificationRepository
+  MarkNotificationReadUseCase --> NotificationRepository
+  CreateCollectionUseCase --> CollectionRepository
+  CreateCollectionUseCase --> CreateCollectionCommand
+  AddObjectToCollectionUseCase --> CollectionRepository
+  RemoveObjectFromCollectionUseCase --> CollectionRepository
+  ListCollectionsUseCase --> CollectionRepository
+  DeleteCollectionUseCase --> CollectionRepository
+  SavePresetUseCase --> VisualizationPresetRepository
+  SavePresetUseCase --> SavePresetCommand
+  UpdatePresetUseCase --> VisualizationPresetRepository
+  ListPresetsUseCase --> VisualizationPresetRepository
+      </pre></div>
+      <figcaption>17 use cases + 3 команды + 2 result-типа (<code>AuthResult</code>, <code>ResolvedFavorite</code>). <code>HandleSatelliteEventUseCase</code> резолвит текст уведомления через <code>event.accept(textBuilder)</code> — Visitor, а не <code>when</code>/instanceof.</figcaption>
+    </figure>
+    <h3>Адаптеры: web + outbound</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+classDiagram
+  direction TB
+
+  class AuthController {
+    +register(request) UserResponse
+    +login(request) AuthResponse
+  }
+  class UserController {
+    +get(id) UserResponse
+  }
+  class FavoriteController {
+    +list(userId, page, size) PageResult
+    +add(userId, request) FavoriteResponse
+    +remove(userId, objectId)
+  }
+  class NotificationController {
+    +list(userId, page, size) PageResult
+    +markRead(id) NotificationResponse
+  }
+  class CollectionController {
+    +list(userId, page, size) PageResult
+    +create(userId, request) CollectionResponse
+    +delete(id)
+    +addObject(id, request) CollectionResponse
+    +removeObject(id, objectId) CollectionResponse
+  }
+  class PresetController {
+    +list(userId, page, size) PageResult
+    +save(userId, request) PresetResponse
+    +update(id, request) PresetResponse
+  }
+  class EventController {
+    +handle(request)
+  }
+  class GlobalExceptionHandler {
+    +handleUserNotFound(e)
+    +handleObjectNotFound(e)
+    +handlePresetNotFound(e)
+    +handleCollectionNotFound(e)
+    +handleNotificationNotFound(e)
+    +handleDuplicateEmail(e)
+    +handleFavoriteAlreadyExists(e)
+    +handleInvalidCredentials(e)
+    +handleValidation(e)
+    +handleTypeMismatch(e)
+    +handleIllegalArgument(e)
+  }
+  class RequestLoggingFilter {
+    +doFilterInternal(...)
+  }
+  class RegisterUserRequest
+  class LoginRequest
+  class UserResponse
+  class AuthResponse
+  class AddFavoriteRequest
+  class FavoriteResponse
+  class NotificationResponse
+  class CollectionRequest
+  class CollectionObjectRequest
+  class CollectionResponse
+  class PresetRequest
+  class PresetResponse
+  class SatelliteEventRequest
+  class UserWebMapper {
+    +toCommand()
+    +toDomainEvent()
+    +toResponse()
+  }
+
+  class SystemClock
+  class BcryptPasswordHasher {
+    +hash(raw) PasswordHash
+    +verify(raw, hash) boolean
+  }
+  class OpaqueTokenProvider {
+    +issue(userId, role) String
+  }
+  class LoggingNotificationSender {
+    +send(user, notification)
+  }
+  class CatalogRestClient {
+    +getObject(objectId) ObjectRef
+    +parseObjectRef(body) ObjectRef
+  }
+  class UserRepositoryAdapter
+  class FavoriteRepositoryAdapter
+  class NotificationRepositoryAdapter
+  class CollectionRepositoryAdapter
+  class VisualizationPresetRepositoryAdapter
+  class UserPersistenceMapper {
+    +toDomain()
+    +toEntity()
+  }
+  class UserEntity
+  class FavoriteEntity
+  class NotificationEntity
+  class CollectionEntity
+  class VisualizationPresetEntity
+  class UserJpaRepository
+  class FavoriteJpaRepository
+  class NotificationJpaRepository
+  class CollectionJpaRepository
+  class VisualizationPresetJpaRepository
+
+  AuthController --> RegisterUserUseCase
+  AuthController --> AuthenticateUserUseCase
+  UserController --> GetUserUseCase
+  FavoriteController --> ListFavoritesUseCase
+  FavoriteController --> AddFavoriteUseCase
+  FavoriteController --> RemoveFavoriteUseCase
+  NotificationController --> ListNotificationsUseCase
+  NotificationController --> MarkNotificationReadUseCase
+  CollectionController --> CreateCollectionUseCase
+  CollectionController --> ListCollectionsUseCase
+  CollectionController --> DeleteCollectionUseCase
+  CollectionController --> AddObjectToCollectionUseCase
+  CollectionController --> RemoveObjectFromCollectionUseCase
+  PresetController --> SavePresetUseCase
+  PresetController --> UpdatePresetUseCase
+  PresetController --> ListPresetsUseCase
+  EventController --> HandleSatelliteEventUseCase
+
+  SystemClock ..|> Clock
+  BcryptPasswordHasher ..|> PasswordHasher
+  OpaqueTokenProvider ..|> TokenProvider
+  LoggingNotificationSender ..|> NotificationSender
+  CatalogRestClient ..|> ObjectRegistryClient
+  UserRepositoryAdapter ..|> UserRepository
+  FavoriteRepositoryAdapter ..|> FavoriteRepository
+  NotificationRepositoryAdapter ..|> NotificationRepository
+  CollectionRepositoryAdapter ..|> CollectionRepository
+  VisualizationPresetRepositoryAdapter ..|> VisualizationPresetRepository
+  UserRepositoryAdapter --> UserJpaRepository
+  FavoriteRepositoryAdapter --> FavoriteJpaRepository
+  NotificationRepositoryAdapter --> NotificationJpaRepository
+  CollectionRepositoryAdapter --> CollectionJpaRepository
+  VisualizationPresetRepositoryAdapter --> VisualizationPresetJpaRepository
+      </pre></div>
+      <figcaption>7 контроллеров, 13 DTO, <code>GlobalExceptionHandler</code> + <code>RequestLoggingFilter</code>. Исходящий слой: BCrypt-хешер, opaque-токен, логирующий отправитель уведомлений и <code>CatalogRestClient</code> (ACL), плюс 5 JPA-адаптеров.</figcaption>
+    </figure>
+    <div class="patterns">
+      <b>Паттерны</b> — <span class="p">Visitor</span>: <code>SatelliteDomainEvent.accept()</code> + <code>SatelliteEventVisitor&lt;R&gt;</code> (реализации <code>NotificationTextBuilder</code>, <code>NotificationSeverityAssessor</code>). <span class="p">Strategy</span>: <code>PasswordHasher</code>→BCrypt, <code>NotificationSender</code>→Logging, <code>TokenProvider</code>→Opaque. <span class="p">Proxy / ACL</span>: <code>CatalogRestClient</code>. <span class="p">Factory Method</span>: <code>User.create()</code>, <code>Favorite.create()</code>, <code>Notification.create()</code>, <code>Collection.create()</code>, <code>VisualizationPreset.create()</code>.
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section id="flows">
+    <p class="eyebrow">08 · Flows</p>
+    <h2>Ключевые потоки</h2>
+
+    <h3>Положение спутника (client → satellite, проверка в catalog)</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant SAT as SatelliteController
+  participant UC as GetPositionUseCase
+  participant CAT as CatalogRestClient
+  participant REPO as SatelliteRepository
+  participant SGP as Sgp4Calculator
+
+  C->>SAT: GET /api/v1/satellites/{objectId}/position?at=…
+  SAT->>UC: execute(objectId, at)
+  UC->>CAT: getObject(objectId)
+  CAT-->>UC: ObjectRef (category)
+  alt category != SATELLITE
+    UC-->>SAT: NotASatelliteException
+  end
+  UC->>REPO: findTle(objectId)
+  REPO-->>UC: TleRecord
+  UC->>SGP: propagate(tle, at)
+  SGP-->>UC: Position
+  UC-->>SAT: Position
+  SAT-->>C: 200 + PositionResponse
+      </pre></div>
+      <figcaption>satellite-service сперва подтверждает в catalog, что объект — спутник (иначе <code>NotASatelliteException</code>), затем считает положение из своей TLE-записи.</figcaption>
+    </figure>
+
+    <h3>Синхронизация → сход с орбиты → уведомление (все три)</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+sequenceDiagram
+  autonumber
+  participant A as Admin
+  participant SAT as AdminController
+  participant UC as SyncSatellitesUseCase
+  participant TLE as CelesTrakClient
+  participant SGP as Sgp4Calculator
+  participant REPO as SatelliteRepository
+  participant CAT as CatalogRestClient
+  participant EV as EventHttpPublisher
+  participant USR as user-service
+
+  A->>SAT: POST /api/v1/admin/sync
+  SAT->>UC: sync()
+  UC->>TLE: fetchActiveSatellites()
+  TLE-->>UC: List&lt;ActiveTle&gt; (по noradId)
+  loop каждый известный спутник
+    alt noradId отсутствует в активных
+      UC->>REPO: saveSatellite(status=DECAYED)
+      UC->>CAT: updateStatus(objectId, DECAYED)
+      UC->>EV: publish(SatelliteEvent(DECAYED))
+      EV->>USR: POST /api/v1/events
+    else есть свежий TLE
+      UC->>SGP: propagate(tle, now)
+      SGP-->>UC: Position
+      UC->>REPO: saveTle + saveSnapshot
+    end
+  end
+  UC-->>SAT: SyncReport(updated, failed, decayed)
+  SAT-->>A: 200
+      </pre></div>
+      <figcaption>Сход определяется по отсутствию NORAD-идентификатора в свежем списке CelesTrak (а не по расчёту траектории). satellite обновляет статус в catalog и шлёт событие в user-service, который рассылает уведомления.</figcaption>
+    </figure>
+
+    <h3>Приём события → уведомление (Visitor в user-service)</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+sequenceDiagram
+  autonumber
+  participant EV as EventController
+  participant UC as HandleSatelliteEventUseCase
+  participant FR as FavoriteRepository
+  participant REPO as NotificationRepository
+  participant VIS as NotificationTextBuilder
+  participant SND as NotificationSender
+
+  EV->>UC: execute(SatelliteDomainEvent)
+  UC->>FR: findUserIdsByObject(event.objectId)
+  FR-->>UC: List&lt;userId&gt;
+  loop каждый владелец избранного
+    UC->>VIS: event.accept(textBuilder)
+    VIS-->>UC: text (по типу события)
+    UC->>REPO: save(Notification.create(...))
+    UC->>SND: send(user, notification)
+  end
+  EV-->>EV: 202 Accepted
+      </pre></div>
+      <figcaption>Текст уведомления выбирается двойной диспетчеризацией: <code>event.accept(visitor)</code> вызывает нужный <code>visit*</code>. Добавление нового типа события заставляет дополнить все существующие visitor'ы — компилятор, а не рантайм.</figcaption>
+    </figure>
+
+    <h3>Избранное (client → user, резолв в catalog)</h3>
+    <figure>
+      <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant USR as FavoriteController
+  participant UC as ListFavoritesUseCase
+  participant FR as FavoriteRepository
+  participant CAT as CatalogRestClient
+
+  C->>USR: GET /api/v1/users/{userId}/favorites?page=0&size=20
+  USR->>UC: execute(userId, page, size)
+  UC->>FR: findByUser(userId, page, size)
+  FR-->>UC: PageResult&lt;Favorite&gt;
+  loop каждый Favorite
+    UC->>CAT: getObject(objectId)
+    CAT-->>UC: ObjectRef (name, category)
+  end
+  UC-->>USR: PageResult&lt;ResolvedFavorite&gt;
+  USR-->>C: 200 + PageResult&lt;FavoriteResponse&gt;
+      </pre></div>
+      <figcaption>user-service хранит только id избранных объектов, а имена/категории резолвит в catalog-service — чтобы не дублировать данные каталога. Ответ постраничный.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 09 -->
+  <section id="data">
+    <p class="eyebrow">09 · Data Model</p>
+    <h2>Схема БД (3 базы данных в одном PostgreSQL)</h2>
+    <p>Каждый сервис владеет своей базой данных (<code>catalog</code>, <code>satellite</code>, <code>user</code>). Межсервисные ссылки (<code>object_id</code>) — логические, а не физические FK: данные живут в разных базах.</p>
+    <div class="grid2">
+      <div>
+        <h3>база: catalog</h3>
+        <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+erDiagram
+  SPACE_OBJECT {
+    uuid id PK
+    varchar name
+    varchar category
+    varchar subcategory
+    varchar description
+    varchar source_id
+    varchar source_type
+    varchar status
+    timestamptz created_at
+    timestamptz updated_at
+  }
+        </pre></div>
+        <p class="small"><code>space_objects</code> — HASH-партиционирована по <code>id</code> (4 партиции).</p>
+      </div>
+      <div>
+        <h3>база: satellite</h3>
+        <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+erDiagram
+  SATELLITE ||--o{ TLE_RECORD : has
+  SATELLITE ||--o{ ORBIT_SNAPSHOT : has
+  SATELLITE {
+    uuid object_id PK
+    int norad_id UK
+    varchar status
+  }
+  TLE_RECORD {
+    uuid object_id PK
+    varchar line1
+    varchar line2
+    timestamptz epoch
+    timestamptz fetched_at
+  }
+  ORBIT_SNAPSHOT {
+    uuid id PK
+    uuid object_id
+    double x
+    double y
+    double z
+    double vx
+    double vy
+    double vz
+    timestamptz calculated_at
+  }
+        </pre></div>
+        <p class="small"><code>orbit_snapshots</code> — HASH-партиционирована по <code>id</code> (4 партиции), индекс по <code>(object_id, calculated_at)</code>. У <code>tle_records</code> первичный ключ — <code>object_id</code> (одна TLE на спутник).</p>
+      </div>
+      <div>
+        <h3>база: user</h3>
+        <div class="diagram"><pre class="mermaid">
+%%{init: {"theme": "dark"}}%%
+erDiagram
+  USERS ||--o{ FAVORITES : has
+  USERS ||--o{ NOTIFICATIONS : has
+  USERS ||--o{ COLLECTIONS : has
+  USERS ||--o{ PRESETS : has
+  COLLECTIONS ||--o{ COLLECTION_OBJECTS : contains
+  USERS {
+    uuid id PK
+    varchar nickname
+    varchar email UK
+    varchar password_hash
+    varchar role
+    timestamptz created_at
+  }
+  FAVORITES {
+    uuid user_id PK
+    uuid object_id PK
+    timestamptz added_at
+  }
+  COLLECTIONS {
+    uuid id PK
+    uuid user_id
+    varchar name
+  }
+  COLLECTION_OBJECTS {
+    uuid collection_id PK
+    uuid object_id PK
+  }
+  PRESETS {
+    uuid id PK
+    uuid user_id
+    varchar colors
+    double scale
+  }
+  NOTIFICATIONS {
+    uuid id PK
+    uuid user_id
+    text text
+    boolean read
+    timestamptz created_at
+  }
+        </pre></div>
+        <p class="small"><code>notifications</code> — HASH-партиционирована по <code>id</code> (4 партиции), индекс по <code>(user_id, created_at)</code>. <code>collection_objects</code> — таблица связи «многие-ко-многим».</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section id="api">
+    <p class="eyebrow">10 · REST API</p>
+    <h2>REST API (по сервисам)</h2>
+
+    <h3>catalog-service :8080</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Метод</th><th>Путь</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/objects</code></td><td>каталог + фильтры <code>category</code>, <code>status</code>, <code>query</code>; пагинация <code>page</code>, <code>size</code></td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/objects/{id}</code></td><td>карточка объекта</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/objects</code></td><td>создать объект (201)</td></tr>
+          <tr><td><span class="verb vput">PUT</span></td><td><code>/api/v1/objects/{id}/category</code></td><td>изменить категорию/подкатегорию</td></tr>
+          <tr><td><span class="verb vpatch">PATCH</span></td><td><code>/api/v1/objects/{id}/status</code></td><td>обновить статус (вызывает satellite-service)</td></tr>
+          <tr><td><span class="verb vdel">DELETE</span></td><td><code>/api/v1/objects/{id}</code></td><td>удалить объект (204)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>satellite-service :8082</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Метод</th><th>Путь</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/satellites/{objectId}/position?at=…</code></td><td>положение через расчёт орбиты</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/satellites/{objectId}/passes</code></td><td>предсказание пролётов (<code>minElevation</code>, <code>window</code>, <code>step</code>)</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/satellites/{objectId}/timeline</code></td><td>история орбит (пагинация <code>page</code>, <code>size</code>)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/admin/sync</code></td><td>синхронизация из CelesTrak → <code>SyncReport</code></td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/admin/satellites</code></td><td>зарегистрировать спутник (201)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>user-service :8083</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Метод</th><th>Путь</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/auth/register</code></td><td>регистрация (201)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/auth/login</code></td><td>вход → <code>AuthResponse</code> (токен)</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/users/{id}</code></td><td>профиль пользователя</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/users/{userId}/favorites</code></td><td>избранное (пагинация)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/users/{userId}/favorites</code></td><td>добавить в избранное (201)</td></tr>
+          <tr><td><span class="verb vdel">DELETE</span></td><td><code>/api/v1/users/{userId}/favorites/{objectId}</code></td><td>убрать из избранного (204)</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/users/{userId}/notifications</code></td><td>уведомления (пагинация)</td></tr>
+          <tr><td><span class="verb vpatch">PATCH</span></td><td><code>/api/v1/notifications/{id}/read</code></td><td>пометить прочитанным</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/users/{userId}/collections</code></td><td>коллекции (пагинация)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/users/{userId}/collections</code></td><td>создать коллекцию (201)</td></tr>
+          <tr><td><span class="verb vdel">DELETE</span></td><td><code>/api/v1/collections/{id}</code></td><td>удалить коллекцию (204)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/collections/{id}/objects</code></td><td>добавить объект в коллекцию</td></tr>
+          <tr><td><span class="verb vdel">DELETE</span></td><td><code>/api/v1/collections/{id}/objects/{objectId}</code></td><td>убрать объект из коллекции</td></tr>
+          <tr><td><span class="verb vget">GET</span></td><td><code>/api/v1/users/{userId}/presets</code></td><td>пресеты (пагинация)</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/users/{userId}/presets</code></td><td>сохранить пресет (201)</td></tr>
+          <tr><td><span class="verb vput">PUT</span></td><td><code>/api/v1/presets/{id}</code></td><td>обновить пресет</td></tr>
+          <tr><td><span class="verb vpost">POST</span></td><td><code>/api/v1/events</code></td><td>приём событий от satellite-service (202)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section id="deploy">
+    <p class="eyebrow">11 · Deploy</p>
+    <h2>Конфигурация и запуск</h2>
+    <p>Секреты — только через env. Каждый сервис — собственный <code>docker-compose.yml</code> со своим postgres и своей базой данных.</p>
+    <pre class="code"><span class="c"># server/catalog-service/docker-compose.yml (реальный файл из репозитория)</span>
+<span class="k">services</span>:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  catalog-service:
+    build:
+      context: .
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/catalog
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: "8080"
+    ports: ["8080:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy</pre>
+    <h3>env-переменные (из application.yml)</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Сервис</th><th>Переменные (значение по умолчанию)</th></tr></thead>
+        <tbody>
+          <tr><td><code>catalog-service</code></td><td><code>DB_URL</code>, <code>DB_USERNAME</code>, <code>DB_PASSWORD</code>, <code>SERVER_PORT</code>=8080</td></tr>
+          <tr><td><code>satellite-service</code></td><td><code>DB_URL</code>, <code>DB_USERNAME</code>, <code>DB_PASSWORD</code>, <code>SERVER_PORT</code>=8082, <code>CATALOG_BASE_URL</code>=http://localhost:8080, <code>CELESTRAK_URL</code>, <code>EVENT_URL</code>=http://localhost:8083/api/v1/events</td></tr>
+          <tr><td><code>user-service</code></td><td><code>DB_URL</code>, <code>DB_USERNAME</code>, <code>DB_PASSWORD</code>, <code>SERVER_PORT</code>=8083, <code>CATALOG_BASE_URL</code>=http://localhost:8080</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note"><b>Единый запуск</b> — корневой <code>docker-compose.yml</code> поднимает все три сервиса с одним <code>postgres</code> и тремя базами (<code>catalog</code>, <code>satellite</code>, <code>user</code> — две последние создаются init-скриптом). Запуск: <code>GITHUB_ACTOR=… GITHUB_TOKEN=… docker compose up --build</code>.</div>
+    <div class="note"><b>Статус деплоя</b> — <code>Dockerfile</code> и <code>docker-compose.yml</code> есть у всех трёх сервисов; каждый поднимает свой postgres и свою базу (<code>catalog</code>, <code>satellite</code>, <code>user</code>).</div>
+    <div class="note"><b>Порядок реализации</b> — сначала <code>shared</code> (типы), затем <code>catalog-service</code> целиком (домен → Liquibase → JPA → use cases → REST → тесты), затем <code>satellite-service</code> (TLE + расчёт + вызовы в catalog), последним <code>user-service</code> (auth + избранное + приём событий).</div>
+  </section>
+
+  <footer>
+    OrbitWatch · полная карта серверной части · catalog + satellite + user<br>
+    стек: Kotlin + Spring Boot 4 · PostgreSQL + Liquibase · hexagonal + microservices
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>
