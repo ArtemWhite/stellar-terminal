@@ -1,0 +1,77 @@
+name: orbitwatch
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  catalog-service:
+    build:
+      context: ./server/catalog-service
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/catalog
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  satellite-service:
+    build:
+      context: ./server/satellite-service
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/satellite
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: "8082"
+      CATALOG_BASE_URL: http://catalog-service:8080
+      CELESTRAK_URL: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle'
+      EVENT_URL: http://user-service:8083/api/v1/events
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: ./server/user-service
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR:-}
+        GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/user
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      SERVER_PORT: "8083"
+      CATALOG_BASE_URL: http://catalog-service:8080
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

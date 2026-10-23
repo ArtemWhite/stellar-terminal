@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0001-create-space-objects
+      author: artemwhite
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: false
+            sql: |
+              CREATE TABLE space_objects (
+                id           uuid NOT NULL,
+                name         varchar(255) NOT NULL,
+                category     varchar(50) NOT NULL,
+                subcategory  varchar(50),
+                description  varchar(1000) NOT NULL,
+                source_id    varchar(255) NOT NULL,
+                source_type  varchar(50) NOT NULL,
+                status       varchar(50) NOT NULL,
+                created_at   timestamptz NOT NULL,
+                updated_at   timestamptz NOT NULL,
+                PRIMARY KEY (id)
+              ) PARTITION BY HASH (id);
+
+              CREATE TABLE space_objects_p0 PARTITION OF space_objects FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+              CREATE TABLE space_objects_p1 PARTITION OF space_objects FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+              CREATE TABLE space_objects_p2 PARTITION OF space_objects FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+              CREATE TABLE space_objects_p3 PARTITION OF space_objects FOR VALUES WITH (MODULUS 4, REMAINDER 3);

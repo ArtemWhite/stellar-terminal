@@ -1,0 +1,4 @@
+# Скрипты, выполняемые в Linux-контейнерах (Gradle wrapper), обязаны быть LF:
+# CRLF в shebang'е (`#!/bin/sh\r`) даёт `./gradlew: not found` при docker build.
+gradlew text eol=lf
+*.sh text eol=lf

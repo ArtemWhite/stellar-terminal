@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0001-create-satellite-schema
+      author: artemwhite
+      changes:
+        - createTable:
+            tableName: satellites
+            columns:
+              - column:
+                  name: object_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: norad_id
+                  type: int
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: status
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: tle_records
+            columns:
+              - column:
+                  name: object_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: line1
+                  type: varchar(80)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line2
+                  type: varchar(80)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: epoch
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fetched_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+        - sql:
+            dbms: postgresql
+            splitStatements: true
+            stripComments: false
+            sql: |
+              CREATE TABLE orbit_snapshots (
+                id            uuid NOT NULL,
+                object_id     uuid NOT NULL,
+                x             double precision NOT NULL,
+                y             double precision NOT NULL,
+                z             double precision NOT NULL,
+                vx            double precision NOT NULL,
+                vy            double precision NOT NULL,
+                vz            double precision NOT NULL,
+                calculated_at timestamptz NOT NULL,
+                PRIMARY KEY (id)
+              ) PARTITION BY HASH (id);
+
+              CREATE TABLE orbit_snapshots_p0 PARTITION OF orbit_snapshots FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+              CREATE TABLE orbit_snapshots_p1 PARTITION OF orbit_snapshots FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+              CREATE TABLE orbit_snapshots_p2 PARTITION OF orbit_snapshots FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+              CREATE TABLE orbit_snapshots_p3 PARTITION OF orbit_snapshots FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+        - createIndex:
+            tableName: orbit_snapshots
+            indexName: idx_orbit_snapshots_object_calculated
+            columns:
+              - column:
+                  name: object_id
+              - column:
+                  name: calculated_at

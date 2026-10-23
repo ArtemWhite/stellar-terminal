@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.24"
+    kotlin("jvm") version "2.4.0"
 }
 
 group = "org.example"
@@ -10,13 +10,17 @@ repositories {
 }
 
 dependencies {
+    implementation("com.artemwhite:catalog-service:1.0.0")
+    implementation("com.artemwhite:satellite-service:1.0.0")
+    implementation("com.artemwhite:user-service:1.0.0")
+    implementation("com.artemwhite:shared:1.0.0")
     testImplementation(kotlin("test"))
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 tasks.test {
     useJUnitPlatform()
-}
-
-kotlin {
-    jvmToolchain(8)
 }

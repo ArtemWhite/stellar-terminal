@@ -50,3 +50,96 @@
   `DECAYED` (сошёл с орбиты) на основе свежих данных источника.
 * **Обработка задержек данных** — если источник не отвечает, объект
   помечается как `STALE` (данные устарели), пользователь видит это в UI.
+
+## 3. Архитектура
+
+Серверная часть — три модуля, каждый со своей зоной ответственности, плюс
+общая библиотека контрактов:
+
+* **catalog-service** (`:8080`) — «что это за объект»: реестр, категории, статусы.
+* **satellite-service** (`:8082`) — «где он сейчас»: TLE, орбиты, пролёты, события схода.
+* **user-service** (`:8083`) — «кто и что сохранил»: пользователи, избранное, уведомления.
+* **shared** (`com.artemwhite:shared`) — общие типы: enum'ы, `ObjectRef`, события, `ProblemDetail`.
+
+Каждый модуль внутренне гексагональный: `domain` (чистый Kotlin) → `application`
+(use cases) → адаптеры (`web` — HTTP, `persistence` — JPA, `outbound` — внешние
+вызовы). Бизнес-логика не зависит от фреймворка и транспорта: порты-интерфейсы
+можно заменить на другую БД, HTTP-клиент или API-слой (REST/gRPC) без переписывания
+use cases. Схема БД — Liquibase-миграции; данные — PostgreSQL (отдельная база на
+модуль: `catalog`, `satellite`, `user`).
+
+Полная карта классов, связей и потоков — в [docs/architecture.html](docs/architecture.html).
+
+## 4. Реализованные возможности
+
+* **catalog-service** — создание/чтение/категоризация/смена статуса/удаление объектов;
+  поиск с фильтрами (категория, статус, подстрока) и пагинацией.
+* **satellite-service** — регистрация спутников; синхронизация TLE из CelesTrak
+  (единственный реализованный внешний источник); расчёт положения (SGP4-подобный,
+  без Orekit); предсказание пролётов; таймлайн орбит с пагинацией; детект схода
+  с орбиты → публикация события.
+* **user-service** — регистрация и вход (BCrypt + opaque-токен); избранное с резолвом
+  объектов в catalog; коллекции; уведомления (генерация через паттерн **Visitor**);
+  пресеты визуализации; приём событий от satellite-service.
+
+API — REST под `/api/v1/...`, с валидацией входных данных (Jakarta Bean Validation),
+корректными HTTP-статусами и единым форматом ошибок (`ProblemDetail`). Подробный
+список эндпоинтов — в разделе 10 схемы [docs/architecture.html](docs/architecture.html).
+
+## 5. Запуск
+
+### Через Docker Compose (рекомендуется)
+
+Из корня репозитория — один postgres и все три сервиса:
+
+```bash
+# GitHub PAT с правами read:packages для приватного репозитория shared
+export GITHUB_ACTOR=ArtemWhite
+export GITHUB_TOKEN=ghp_...
+
+docker compose up --build
+```
+
+Сервисы поднимутся на `http://localhost:8080` (catalog), `:8082` (satellite),
+`:8083` (user); PostgreSQL — на `:5432` (базы `catalog`, `satellite`, `user`
+создаются автоматически). База `catalog` создаётся entrypoint'ом, остальные две —
+скриптом `docker/postgres/init/01-create-databases.sql`.
+
+Каждый сервис также имеет собственный `docker-compose.yml` в своей папке
+(`server/<service>/docker-compose.yml`) для запуска по отдельности.
+
+### Локально (без Docker)
+
+Сборка сервисов через Gradle (нужен JDK 17; `shared` подтягивается из соседнего
+`shared/` или из GitHub Packages):
+
+```bash
+cd server/catalog-service    && ./gradlew bootRun   # :8080
+cd server/satellite-service  && ./gradlew bootRun   # :8082
+cd server/user-service       && ./gradlew bootRun   # :8083
+```
+
+## 6. Конфигурация
+
+Секреты и параметры окружения не хранятся в коде — только через переменные среды
+(см. `src/main/resources/application.yml` в каждом сервисе):
+
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | подключение к PostgreSQL | `jdbc:postgresql://localhost:5432/<db>`, `postgres`, `postgres` |
+| `SERVER_PORT` | порт сервиса | 8080 / 8082 / 8083 |
+| `CATALOG_BASE_URL` | адрес catalog-service (для satellite/user) | `http://localhost:8080` |
+| `CELESTRAK_URL` | источник TLE (satellite) | CelesTrak active gp.php |
+| `EVENT_URL` | эндпоинт событий user-service (satellite) | `http://localhost:8083/api/v1/events` |
+
+## 7. Тесты
+
+Юнит-тесты (JUnit 5) и интеграционные тесты (Testcontainers + PostgreSQL),
+покрытие по строкам ≈ 95%:
+
+```bash
+cd server/<service>
+./gradlew test              # юнит-тесты
+./gradlew integrationTest   # интеграционные (нужен Docker)
+./gradlew jacocoTestReport  # отчёт о покрытии → build/reports/jacoco
+```

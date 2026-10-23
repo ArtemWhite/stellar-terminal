@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    # Throwaway Postgres spun up by Testcontainers via the `tc:` JDBC driver.
+    url: jdbc:tc:postgresql:16-alpine:///satellite
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: postgres
+    password: postgres
